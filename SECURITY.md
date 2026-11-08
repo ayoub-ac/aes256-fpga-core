@@ -9,9 +9,10 @@ Don't trust marketing copy; trust the threat model and your own evaluation.
 
 ## What's in the secure variant
 
-`rtl/aes256_core_secure.sv` is the hardened sibling of `aes256_core`. Same
+`rtl/aes256_core_secure.sv` is the sibling of `aes256_core` intended to be hardened (not evaluated). Same
 algorithm (AES-256, FIPS-197), same I/O contract, plus a `random_i` input and
-a `fault_o` output. The countermeasures it implements are:
+a `fault_o` output. The countermeasures it is intended to implement (none has
+been evaluated) are:
 
 ### 1. State-level Boolean masking (1st-order)
 
@@ -27,7 +28,7 @@ does not enter the masked state register; it is loaded directly into
 `rk_q[0..1]` of the schedule. A 256-bit `random_i` would cost an extra
 128 bits of TRNG entropy per block with no additional protection.
 
-**What this protects:** simple power-analysis attacks that target the cipher
+**What this is intended to protect (not evaluated):** simple power-analysis attacks that target the cipher
 state register's transition activity. Two encryptions of the same plaintext
 under the same key will toggle the state register through different bit
 patterns depending on `random_i`, breaking the simple correlation model.
@@ -52,7 +53,7 @@ The round counter is duplicated as `round_q` and `round_q2`. Every clock the
 two are compared; a mismatch transitions the FSM into `S_FAULT` and asserts
 `fault_o`. The output is wiped and `ready_o` is held low until the next reset.
 
-**What this protects:** single-bit fault injection on either of the two round
+**What this is intended to protect (not evaluated):** single-bit fault injection on either of the two round
 counter flip-flops (laser fault injection, EMFI, voltage glitching that
 flips an FF). An attacker who can flip exactly one bit in `round_q` to skip a
 round (a classic AES fault attack) is detected.
@@ -64,26 +65,27 @@ state register would also need to be duplicated and compared.
 
 ### 3. Constant-time FSM
 
-There are no data-dependent branches in the FSM. Every block takes the same
-23 cycles regardless of key or plaintext content (7 expand + 14 round + 2
-handshake), and there are no early-exit or fast-path branches. This is
-verified by inspection of the FSM and by the back-to-back test in the basic
-testbench, which observes a constant 23 cycles/block across many distinct
-inputs.
+The FSM is intended to be constant-time; not evaluated. It is designed with
+no data-dependent branches, so that every block takes the same 23 cycles
+regardless of key or plaintext content (7 expand + 14 round + 2 handshake),
+with no early-exit or fast-path branches. The back-to-back test in the basic
+testbench checks for a constant 23 cycles/block across distinct inputs;
+results not independently confirmed.
 
-**What this protects:** timing attacks that observe block-completion latency.
+**What this is intended to protect (not evaluated):** timing attacks that
+observe block-completion latency.
 
 ### 4. Constant-cycle output reveal + state wipe
 
 The unmasked ciphertext/plaintext is revealed only in `S_DONE`, on the cycle
 after the final round. The output and registered masked state are wiped on
 transition back to `S_IDLE`. The mask itself is wiped one cycle earlier
-(end of the final round). There is no scenario where an attacker can read
-partial state via `data_o`.
+(end of the final round). This is intended to prevent an attacker from
+reading partial state via `data_o`; not evaluated.
 
 ## What's NOT covered (be honest)
 
-This list is deliberately exhaustive so that purchasers can evaluate fit:
+This list is deliberately exhaustive so that users can evaluate fit:
 
 - **Higher-order DPA**: 2nd-order and above attacks combine multiple leakage
   points and are not addressed by 1st-order Boolean masking. Mitigation
@@ -109,9 +111,10 @@ your system relies on AES integrity, this core is not enough on its own.
 
 ## Compliance claims
 
-- **FIPS-197 conformance**: yes. The RTL implements the AES-256 block cipher
-  exactly as specified in FIPS-197 and is verified against published NIST
-  test vectors (FIPS-197 Appendix C.3, NIST SP 800-38A F.1.5 / F.1.6).
+- **FIPS-197 conformance**: not validated. The RTL implements the FIPS-197
+  AES-256 algorithm (not validated). Published NIST test vectors (FIPS-197
+  Appendix C.3, NIST SP 800-38A F.1.5 / F.1.6) are included in the
+  testbench; results not independently confirmed.
 - **FIPS-140-2 / FIPS-140-3 certification**: NOT claimed. FIPS-140 is a
   module-level certification covering far more than the algorithm
   (RNG quality, key zeroization, role-based authentication, physical
@@ -119,36 +122,36 @@ your system relies on AES integrity, this core is not enough on its own.
   implements one of the building blocks; it is not by itself a FIPS-140
   cryptographic module.
 - **Common Criteria**: not evaluated.
-- **NIST CAVP test certificate**: the RTL passes NIST FIPS-197 known-answer
-  tests in simulation, but is not registered with NIST CAVP. CAVP requires a
+- **NIST CAVP test certificate**: not validated. NIST FIPS-197 known-answer
+  tests are included in the simulation testbench (results not independently
+  confirmed), and the RTL is not registered with NIST CAVP. CAVP requires a
   test harness running on the certified platform, which is the integrator's
   responsibility.
 
 ## Test methodology used to validate the security claims
 
-The Verilator testbench in `tb/sim_secure.cpp` runs:
+The Verilator testbench in `tb/sim_secure.cpp` contains the checks below. The
+checks are included; results not independently confirmed.
 
 1. **Functional correctness on NIST test vectors** with a non-zero `random_i`.
    Verifies that masking does not change the produced ciphertext. 3 enc + 3
-   dec across FIPS-197 App.C.3 and SP 800-38A F.1.5 vectors. ([+PASS] in
-   `test_secure.log`, suite `S1`.)
+   dec across FIPS-197 App.C.3 and SP 800-38A F.1.5 vectors. (Suite `S1`.)
 2. **Mask invariance**: same key + same plaintext, four different `random_i`
-   values, same ciphertext expected. ([+PASS], suite `S2`.)
+   values, same ciphertext expected. (Suite `S2`.)
 3. **Internal state differs**: snapshot the registered `state_masked_q` mid-
    operation under two distinct `random_i` values; the registered state must
    differ. This is a direct test that masking is actually applied to the
-   register, not optimized away. ([+PASS], suite `S3`.)
+   register, not optimized away. (Suite `S3`.)
 4. **Fault injection**: corrupt `round_q2` mid-operation through Verilator's
    public-flat-rw access, verify `fault_o` rises and `ready_o` falls. Then
    reset, verify `fault_o` clears and the core encrypts correctly post-reset.
-   ([+PASS], suite `S4`.)
+   (Suite `S4`.)
 
 We do NOT run experimental DPA / CPA against the bitstream. The 1st-order DPA
 resistance claim on the state register is **design intent**, derived from the
-masking scheme. If you need an experimentally-verified claim, that is a
-separate engagement that requires a real FPGA, an oscilloscope, and a
-trace-collection campaign measured in days or weeks. We do not sell that as
-part of the Premium tier.
+masking scheme. An experimentally verified claim would require a real FPGA,
+an oscilloscope, and a trace-collection campaign measured in days or weeks;
+none has been done.
 
 In other words: the secure variant is "designed to resist 1st-order DPA on
 the cipher state register per the published Boolean masking scheme" — not
@@ -170,5 +173,5 @@ the cipher state register per the published Boolean masking scheme" — not
 ## Reporting issues
 
 Found a bug, a side channel we missed, or a discrepancy with FIPS-197?
-Open an issue or contact the email in the README. Coordinated disclosure
-welcome. We do not currently offer a bug bounty.
+Open a GitHub issue; do not post confidential details in it. Coordinated
+disclosure welcome. We do not currently offer a bug bounty.

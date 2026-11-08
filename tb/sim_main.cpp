@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later OR Commercial
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 // Copyright (C) 2026 Ayoub Achour
 //
 // Verilator C++ harness for aes256_core. Drives FIPS-197 / SP 800-38A

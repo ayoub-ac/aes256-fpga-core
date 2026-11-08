@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later OR Commercial
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 // Copyright (C) 2026 Ayoub Achour
 //
 // NIST FIPS-197 / NIST SP 800-38A AES-256 reference test vectors.

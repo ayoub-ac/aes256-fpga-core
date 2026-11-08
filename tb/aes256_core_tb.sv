@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later OR Commercial
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 // Copyright (C) 2026 Ayoub Achour
 //
 // Top-level testbench wrapper for aes256_core. Stimulus is driven from the C++

@@ -70,11 +70,11 @@ data_o     -   D   D   -
 
 ## Timing
 
-- **Latency**: from the cycle `valid_i && ready_o` is captured to the cycle `valid_o` rises is approximately 23 cycles in this MVP (7 expansion cycles + 14 round cycles + FSM transitions). Verified at exactly 23 cycles per block in the back-to-back throughput test.
-- **Throughput**: one block per ~23 cycles. At 50 MHz that is ~278 Mbps; at 100 MHz, ~556 Mbps.
+- **Latency**: from the cycle `valid_i && ready_o` is captured to the cycle `valid_o` rises is approximately 23 cycles in this MVP (7 expansion cycles + 14 round cycles + FSM transitions). The back-to-back throughput test checks for exactly 23 cycles per block; results not independently confirmed.
+- **Throughput**: one block per ~23 cycles. At 50 MHz that is ~278 Mbps; at 100 MHz, ~556 Mbps (unverified estimates derived from the cycle count).
 - **Back-to-back**: yes — the master can present a new `(key, data)` on the same cycle it consumes the previous output (`valid_o && ready_i` and immediately `valid_i` for the next block).
 
-For a steady stream where the key does not change, the Premium key-cached variant skips the 7-cycle expansion to reach ~16 cycles per block.
+No key-cached variant that skips the 7-cycle expansion for a stable key is included in this repository.
 
 ## Reset
 
@@ -105,6 +105,6 @@ Single clock domain. `clk_i` clocks every flop in the design. If your system is 
 
 ## Synthesis attributes
 
-The core uses no vendor-specific attributes. It synthesizes cleanly with Yosys (`synth_ice40`, `synth_ecp5`, `synth_xilinx`) and with Vivado (default flow).
+The core uses no vendor-specific attributes. It is intended to synthesize with Yosys (`synth_ice40`, `synth_ecp5`, `synth_xilinx`) and with Vivado (default flow); not independently confirmed.
 
 The S-box and inverse-S-box are written as `case` statements; Yosys infers a LUT, Vivado infers either LUTs or a distributed-RAM ROM depending on the device.

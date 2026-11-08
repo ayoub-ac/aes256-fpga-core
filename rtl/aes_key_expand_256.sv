@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later OR Commercial
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 // Copyright (C) 2026 Ayoub Achour
 //
 // AES-256 key expansion step (FIPS-197 section 5.2).

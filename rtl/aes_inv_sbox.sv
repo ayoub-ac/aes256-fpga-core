@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later OR Commercial
+// SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 // Copyright (C) 2026 Ayoub Achour
 //
 // AES inverse S-box (FIPS-197 Figure 14). Used by InvSubBytes during decrypt.

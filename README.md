@@ -1,26 +1,26 @@
 # aes256-fpga-core
 
 [![License: GPL-3.0-or-later or commercial](https://img.shields.io/badge/license-GPL--3.0%20%7C%20commercial-blue.svg)](LICENSE.md)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#verification)
-[![FIPS-197 vectors](https://img.shields.io/badge/FIPS--197-NIST%20vectors-blue.svg)](#verification)
-[![Lint](https://img.shields.io/badge/Verilator%20lint-clean-brightgreen.svg)](#build--test)
+
+> **Status: experimental and unverified.** This core was written with AI assistance and has not been independently verified in simulation regressions, formal proofs or hardware. Claims in this repository about standards compliance, test results, timing and resource use are unverified. It has not been validated under NIST CAVP/CMVP and has not been evaluated for side-channel or fault-injection resistance. Do not use it in production or security-sensitive designs without your own verification. No support or maintenance is provided.
 
 A small, synthesisable AES-256 IP core in SystemVerilog. One round per cycle,
 encrypt and decrypt sharing the same datapath, single clock domain. Targets
 iCE40, ECP5, Xilinx 7-series, Cyclone V, and Tang Nano 9K.
 
-The core is a clean implementation of FIPS-197 verified end-to-end against
-NIST FIPS-197 / SP 800-38A test vectors with the open-source Verilator
-simulator. No FPGA hardware required for the test suite.
+The core implements the FIPS-197 algorithm (not validated). NIST FIPS-197 /
+SP 800-38A test vectors are included in a Verilator testbench; results not
+independently confirmed. No FPGA hardware is required to run the test suite.
 
 ## Why this exists
 
 AES-128 is fine for almost every use that picks AES at all; the
-[aes128-fpga-core](https://github.com/ayoubac/aes128-fpga-core) sister project
+[aes128-fpga-core](https://github.com/ayoub-ac/aes128-fpga-core) sister project
 covers that case. The moment a compliance team is involved — FIPS 140-3
 modules, GDPR-sensitive payloads, banking, healthcare, government-adjacent
 integrators — the spec line item often reads "AES with a 256-bit key" and
-nothing else will do. This core fills that slot, with a clean dual license,
+nothing else will do. This core is intended to fill that slot (it is not
+validated under FIPS 140-3 or NIST CAVP), with a clean dual license,
 a real handshake protocol, NIST vectors in the testbench, SystemVerilog
 assertions, functional coverage, and a synthesis-comparison report across
 multiple toolchains.
@@ -28,7 +28,7 @@ multiple toolchains.
 ## Quickstart
 
 ```bash
-git clone https://github.com/ayoubac/aes256-fpga-core.git
+git clone https://github.com/ayoub-ac/aes256-fpga-core.git
 cd aes256-fpga-core
 make lint test            # Verilator lint + run NIST vector tests
 make synth_report         # SYNTH_REPORT.md across iCE40/ECP5/Xilinx/Vivado/Quartus
@@ -57,8 +57,9 @@ Requires Verilator 5.0+ for simulation. Yosys 0.30+ for the open synth flow.
 FSM: `IDLE -> EXPAND (7c) -> RUN (14c) -> DONE -> IDLE`. AES-256 has a
 2-key-per-step expansion (Nk = 8), so 7 expand cycles produce all 15 round
 keys; the 14 cipher rounds run over the next 14 cycles. Latency: 23 cycles
-per block in the basic core. The pipelined variant achieves one block per
-cycle steady-state after a 15-cycle fill.
+per block in the basic core (design intent, unverified). The pipelined
+variant is intended to reach one block per cycle steady-state after a
+15-cycle fill (unverified).
 
 ## Port table
 
@@ -80,7 +81,9 @@ protocol with timing diagrams.
 
 ## Headline numbers
 
-Real numbers from `make synth_report` (Yosys 0.33, basic iterative core):
+Unverified estimates attributed to `make synth_report` (Yosys 0.33, basic
+iterative core). They have not been independently reproduced, and the clock
+frequencies are not backed by place-and-route timing:
 
 | Target           | LUT          | FF   | BRAM | Latency    | Throughput @ Fmax     |
 |------------------|--------------|------|------|------------|-----------------------|
@@ -89,7 +92,8 @@ Real numbers from `make synth_report` (Yosys 0.33, basic iterative core):
 | Xilinx Artix-7   | 2461 LUT     | 2189 | 0    | 23 cycles  | ~835 Mbps @ 150 MHz   |
 
 \* ECP5 generic synth with Yosys does not infer distributed RAM for the
-round-key bank; `nextpnr-ecp5` packing reduces this 4-5x.
+round-key bank; `nextpnr-ecp5` packing is expected to reduce this 4-5x
+(unverified estimate).
 See [`RESOURCE_ESTIMATES.md`](RESOURCE_ESTIMATES.md) for the full breakdown.
 
 ## Build & test
@@ -103,11 +107,13 @@ make test-secure   # build and run secure-variant test suite
 make test-all      # run both
 ```
 
-A passing run ends with `+PASS all tests passed` and exits 0.
+The harness is written to end a passing run with `+PASS all tests passed` and
+exit 0. No passing run has been independently confirmed.
 
 ## Verification
 
-Three orthogonal techniques are wired into the testbench:
+Three techniques are wired into the testbench. Test vectors are included;
+results not independently confirmed.
 
 ### Directed tests (10 groups)
 
@@ -116,7 +122,7 @@ Three orthogonal techniques are wired into the testbench:
 | 1 | NIST vectors, encrypt                 | FIPS-197 App.C.3, NIST SP 800-38A F.1.5      |
 | 2 | NIST vectors, decrypt                 | Same vectors run backwards                   |
 | 3 | `decrypt(encrypt(x)) == x`            | Round-trip on edge plaintexts                |
-| 4 | Back-to-back throughput               | 16 blocks, observes ~23 cycles/block         |
+| 4 | Back-to-back throughput               | 16 blocks, checks for ~23 cycles/block       |
 | 5 | Edge-case known vectors               | All-zero, all-FF, single-bit                 |
 | 6 | 1000 random round-trips               | Statistical sanity                           |
 | 7 | Back-to-back with key changes         | Schedule re-expansion correctness            |
@@ -126,8 +132,8 @@ Three orthogonal techniques are wired into the testbench:
 
 ### SystemVerilog assertions
 
-`tb/aes256_core_assertions.sv` enforces protocol invariants on every cycle of
-every test:
+`tb/aes256_core_assertions.sv` is intended to check protocol invariants on
+every cycle of every test:
 
 - `valid_o` cannot rise sooner than 15 cycles after an accepted command
 - `data_o` is stable while back-pressured (`valid_o && !ready_i`)
@@ -135,13 +141,14 @@ every test:
 - The round counter never exceeds 14
 - `ready_o` and `valid_o` are mutually exclusive
 
-The assertions compile with both Verilator 5.x (`--assert`) and Vivado
-xsim. They are stripped on synthesis flows via `` `ifndef SYNTHESIS ``.
+The assertions are intended to compile with both Verilator 5.x (`--assert`)
+and Vivado xsim (not independently confirmed). They are stripped on synthesis flows via `` `ifndef SYNTHESIS ``.
 
 ### Functional coverage
 
 `tb/aes256_core_cov.sv` collects nine bins. The simulator prints a
-coverage summary at end-of-test:
+coverage summary at end-of-test in this format (illustrative output; results
+not independently confirmed):
 
 ```
 ---- Functional coverage ----
@@ -151,7 +158,7 @@ coverage summary at end-of-test:
 Coverage: 9/9 bins (100.0%)
 ```
 
-A regression that drops below 100% fails the gate.
+The harness is intended to fail a run that drops below 100%.
 
 ### Synthesis comparison report
 
@@ -163,12 +170,12 @@ when not on `$PATH`.
 
 ## Variants
 
-| Variant                            | Use case                                                                                                  | Tier    |
-|------------------------------------|-----------------------------------------------------------------------------------------------------------|---------|
-| `rtl/aes256_core.sv`               | Default: 23-cycle iterative core, encrypt + decrypt                                                       | GPL     |
-| `rtl/aes256_core_pipelined.sv`     | Fully unrolled, ~14x throughput at ~5x area, encrypt-only                                                 | Premium |
-| `rtl/aes256_core_secure.sv`        | Boolean masking + duplicated round counter + constant-time FSM. See [`SECURITY.md`](SECURITY.md).         | Premium |
-| `vhdl_wrapper/aes256_core_vhdl.vhd` | VHDL-2008 entity wrapping the SV core for VHDL-only designs                                              | All     |
+| Variant                            | Use case                                                                                                  |
+|------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `rtl/aes256_core.sv`               | Default: 23-cycle iterative core, encrypt + decrypt                                                       |
+| `rtl/aes256_core_pipelined.sv`     | Fully unrolled, encrypt-only; ~14x throughput at ~5x area (unverified estimate)                           |
+| `rtl/aes256_core_secure.sv`        | Intended to add Boolean masking, a duplicated round counter and a constant-time FSM; not evaluated. See [`SECURITY.md`](SECURITY.md). |
+| `vhdl_wrapper/aes256_core_vhdl.vhd` | VHDL-2008 entity wrapping the SV core for VHDL-only designs                                              |
 
 ## License
 
@@ -176,9 +183,8 @@ Dual-licensed:
 
 - **GPL-3.0-or-later** for open-source projects. If your product links this
   RTL or its compiled bitstream, your project must also be GPL-3.0+.
-- **Commercial license** for closed-source products. Tiers and pricing in
-  [`PRICING.md`](PRICING.md). See [`LICENSE.md`](LICENSE.md) for the legal
-  text and an FAQ.
+- **Commercial license** for closed-source products. Commercial licenses are available on request: open a GitHub issue titled 'Commercial license request'. Do not post confidential details in the issue. Any commercial license is provided as is, without warranty, support or maintenance. This core is unverified (see README).
+  See [`LICENSE.md`](LICENSE.md) for the license text.
 
 If unsure which applies, read `LICENSE.md` or open an issue.
 
@@ -188,7 +194,7 @@ If unsure which applies, read `LICENSE.md` or open an issue.
 rtl/                       RTL sources
   aes256_core.sv             top-level basic core, FSM, round-key store
   aes256_core_pipelined.sv   fully unrolled variant
-  aes256_core_secure.sv      SCA-hardened variant
+  aes256_core_secure.sv      variant intended to be SCA-hardened; not evaluated
   aes_round.sv               combinational SubBytes/ShiftRows/MixColumns + inverses
   aes_key_expand_256.sv      one-step AES-256 key expansion (8 words/cycle)
   aes_sbox.sv                forward S-box LUT (FIPS-197 Fig. 7)
@@ -214,7 +220,8 @@ Bug reports and patches welcome. Process:
 1. File an issue first for non-trivial changes.
 2. Fork, branch, and run `make lint test test-secure` locally.
 3. Open a pull request with a description of what changed and why.
-4. CI runs the full test suite plus `synth_report`; both must be green.
+4. There is no CI; include the output of your local `make lint test test-secure`
+   run in the pull request.
 
 ## Citation
 
@@ -223,7 +230,7 @@ Bug reports and patches welcome. Process:
   title  = {{aes256-fpga-core}: a small dual-licensed AES-256 IP core in SystemVerilog},
   author = {Achour, Ayoub},
   year   = {2026},
-  howpublished = {\url{https://github.com/ayoubac/aes256-fpga-core}}
+  howpublished = {\url{https://github.com/ayoub-ac/aes256-fpga-core}}
 }
 ```
 
@@ -239,4 +246,4 @@ Bug reports and patches welcome. Process:
 
 ## Author
 
-Ayoub Achour - [github.com/ayoubac](https://github.com/ayoubac)
+Ayoub Achour - [github.com/ayoub-ac](https://github.com/ayoub-ac)
